@@ -1,0 +1,6 @@
+this file give a basic introductory course on starting football analytics
+it should be a fun and interactive class
+Do not be too worried about a lack of mathematical background
+We will discuss some varying coaching techniques
+Stay safe !!
+
