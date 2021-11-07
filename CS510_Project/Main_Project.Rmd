@@ -14,14 +14,15 @@ Premier League data
 #### Let us begin by adding the necessary libraries needed .
 
 
-```{r, include=TRUE}
+```{r, include=FALSE}
 library(devtools)
-library(engsoccerdata)
+library(testthat)
 library(tidyverse)
+library(engsoccerdata)
 set.seed(2021)
 ```
 
-##### Loading English Premier League data from the engsoccerdata and filtering the relevant season out.
+#### Loading English Premier League data from the engsoccerdata and filtering the relevant season out.
 ```{r}
 main_data<- engsoccerdata::england %>%
   filter(Season>1991)%>%
@@ -29,7 +30,7 @@ main_data<- engsoccerdata::england %>%
 
 ```
 
-##### Let us have a sneek peak into our data
+#### Let us have a sneek peak into our data
 ```{r, include=TRUE}
 head(main_data)
 
@@ -50,12 +51,12 @@ hist(main_data$totgoal, col= 'green', xlab = 'Goals', main= 'Frequency of both h
 par(mfrow=c(1,2),
   mar=c(4,4,1,0))
 
-hist(main_data$hgoal , col=rgb(1,0,0,0.5) ,xlim = c(0,7), xlab="Goals" , ylab="No. of matches" , main="Frequency of home goals" )
+hist(main_data$hgoal,col=rgb(1,0,0,0.5),xlim = c(0,7), xlab="Goals" , ylab="No. of matches" , main="Frequency of home goals" )
 
-hist(main_data$agoal, breaks=30  , xlim = c(0,7),col=rgb(0,0,1,0.5) , xlab="Goals" , ylab="" , main="Frequency of away goals")
+hist(main_data$agoal, xlim = c(0,7),col=rgb(0,0,1,0.5) , xlab="Goals" , ylab="" , main="Frequency of away goals")
 ```
 
-###### We observe home teams seem to score more goals in comparison with away teams. Thus,that should influence our modelling decisions.
+##### We observe home teams seem to score more goals in comparison with away teams. Thus,that should influence our modelling decisions.
 
 #### Modelling
 ##### In comparison with other sports like basketball, soccer is a low scoring sport. Goals are also scored randomly at any point in time. The ability of a team to score should thus depend on the strength of the team offensively and defensive abiliities of the opponent. We will use the Poisson distribution as a base model. We will generate poisson distributions with the means as average home and away goals scored and see how well they could fit our data
@@ -87,4 +88,125 @@ ggplot(main_data, aes(agoal)) +
        x = "goals scored", y = "density") + geom_density(data =data_away_poisson, aes(x = away_poisson),fill = NA, adjust = 8, alpha = 0.2) 
 ```
 
-##### We observe both are not bad fits to the data at all and the poisson distribution could be a good starting model to fit the data. It is important to note that, we haven't made any statistical tests to validate the claim the data is actually poisson distributed. the eye test just shows that it isn't a bad choice. Now, we need to estimate the strenght of a team offensively, its opponents defensive abilities and whether they are playing at home or away. Before we do that, let us check whether there was indeed a home advantage for teams during the pandemic. Recall that, during the pandemic, there were no fans in the stadium and there were some really interesting results during that period.
+##### We observe both are not bad fits to the data at all and the poisson distribution could be a good starting model to fit the data. It is important to note that, we haven't made any statistical tests to validate the claim the data is actually poisson distributed. the eye test just shows that it isn't a bad choice. Now, we need to estimate the strenght of a team offensively, its opponents defensive abilities and whether they are playing at home or away. Before we do that, let us check whether there was indeed a home advantage for teams during the pandemic. Recall that, during the pandemic, there were no fans in the stadium and there were some really interesting results during that period.We will use data from another source(a website) given that gives the most recent soccer data(2019 and above)
+
+
+```{r}
+#Pandemic season
+sample <- read.csv("http://www.football-data.co.uk/mmz4281/1920/E0.csv")
+
+#filtering out the relevant columns 
+data<- sample %>%
+  select(HomeTeam,AwayTeam,HomeGoal= FTHG, AwayGoal=FTAG)
+
+#Filtering only the home team data
+home<- data%>%
+  select(team= HomeTeam,opponent=AwayTeam,goals=HomeGoal)%>%
+  add_column(Fans= 1) #adding columns to reflect home advantage (1)
+
+#Filtering out the away team data  
+away<- data%>%
+  select(team=AwayTeam,opponent=HomeTeam,goals=AwayGoal)%>%
+  add_column(Fans=0) #away team gets a 0
+
+```
+
+
+```{r}
+par(mfrow=c(1,2),
+  mar=c(4,4,1,0))
+
+hist(home$goals , col=rgb(1,0,0,0.5) ,xlim = c(0,7), ylim=c(0,250),  xlab="Goals" , ylab="No. of matches" , main="Pandemic  home goals" )
+
+hist(away$goals, xlim = c(0,7),col=rgb(0,0,1,0.5) , xlab="Goals" , ylab="" , main="Pandemic  away goals")
+
+
+```
+
+
+
+##### Interestingly, there wasn't much difference between the proportin of goals scored by home and away teams. Yes, the home teams still did score a bit more in comparison with the away team. But clearly, the absence of fans and less buoyant atmospheres in stadiums probably played a part in the seemingly lack of home advantage.Now, given we are confident teams playing at home seem to have an advantage, we can proceed to the modelling task. We will ue the Poisson regression to extract the attacking and defensive strengths of each team
+
+
+```{r}
+#Merging the home and away data
+merge_data<- rbind(home,away)
+
+#Now let use the Poisson regression to get the coeffients for the teams
+modela = glm(goals ~ Fans+team+opponent, family = poisson, data = merge_data)
+
+modela
+
+```
+
+
+##### So what do the coefficients tell us? Well, there are two things. How well do teams perform offensively(scoring goals(team)) and how well do they do perform defensively (NOT conceding goals(opponent)). The Intercept happens to be the benchmark for comparisons for all teams. The model by default uses Arsenal (because of alphabetical order) as the benchmark
+
+##### FOR OFFENSIVE STRENGTH:
+##### A larger coefficient value than the intercept suggests that team is performing better on average than Arsenal (intercept). A team with a positive coefficient means it is strong team offensively (doing good). A team with a negative coefficient means it is not strong offensively(not doing good)
+
+##### FOR DEFENSIVE STRENGTH:
+##### A smaller value than the intercept suggests that team is performing well on average defensively than Arsenal 
+##### A team with a negative coefficient means it is performing well defensively
+##### A team with a positive coefficient means it is NOT performing well defensively
+
+
+#### Recall  we needed to actually see how well the claim that Poisson distribution will give us a good fit to the data? Well, now is the time to validate that.Let us see if the model fits the data well. We will use the residual deviance and it's corresponding degrees of freedom in finding the chi square goodness of fit
+
+```{r}
+pchisq(765.20,720)
+
+
+```
+
+##### The pvalue is 0.881 which is significantly bigger than the alpha level of 0.05. Thus it looks like a good fit
+
+
+##### Now, let us get to the fun bit. We will extract the attacking and defensive strength parameters of the teams that will play.We will try with Manchester City vs Arsenal as a test case.
+
+```{r}
+home_team= 'Man City'
+away_team= 'Arsenal'
+
+#home team parameters
+home_goal_rate<- predict(modela, data.frame(team=home_team,opponent= away_team, Fans=1), type='response')
+
+#away team parameters
+away_goal_rate<- predict(modela,data.frame(team=away_team,opponent= home_team, Fans=0), type= 'response')
+
+
+```
+
+##### We discussed about randomness in football. Yes, I know it sounds a bit strange et al, but there is randomness everywhere and that really helps in model building. Football is no different. We will see the number of different scoreline(outcome) we could potentially get for a match 
+
+```{r}
+predictor<- function(){
+#generating random poisson with the home and away rate of the teams playing(Man City vs Arsenal)
+home_goals<- rpois(1,home_goal_rate)
+away_goals<- rpois(1,away_goal_rate)
+print(paste(home_team,"vs", away_team, ":", toString(home_goals), "-", toString(away_goals)))
+}
+
+```
+
+##### Now, try runnig the predictor() function severally. You should expect different outcomes everytime. That shows the randomness in football (soccer). YES, TRY IT . SHOULD BE FUN !!!!
+
+```{r}
+#Run the predictor function  to see the randomness in football
+predictor()
+
+```
+
+#### TESTS !!!! 
+##### Now let us test the logic of our code. We expect goals to always be nonnegative, Thus the sum of both home and away goals should be gretater than or equal to 0. You can also ran that code several times because of the randomness of results, you'll always have different outcomes which MUST pass the test
+
+```{r}
+test_that("single number", {
+  expect_gte(rpois(1,home_goal_rate)+rpois(1,away_goal_rate), 0)
+})
+
+
+```
+
+
+
