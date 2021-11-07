@@ -8,6 +8,7 @@ We will also potentially explore the Bayesian approach to building the model. Gi
 future work, we will include the market  value of  players, injury situations, lineups, 
 uncertainty around the club(press)  and a host of other interesting variables.
 
+Download the CS_510 R project folder or you could just clone the repository.
 Remember to install all the needed packages prior to running the file..
 
 
