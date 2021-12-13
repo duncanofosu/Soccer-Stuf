@@ -19,6 +19,7 @@ library(devtools)
 library(testthat)
 library(tidyverse)
 library(engsoccerdata)
+library(Matrix)
 set.seed(2021)
 ```
 
@@ -39,15 +40,16 @@ head(main_data)
 ##### To begin modeling, let us visualize our data. Let us look at the number of goals scored in a football match. It is important to note that, goals can be scored at any time during a football match. That randomness is very important during the modeling stage.
 
 ```{r, include=TRUE}
+
 hist(main_data$totgoal, col= 'green', xlab = 'Goals', main= 'Frequency of both home and away goals',
      ylab= 'No of matches',xlim = c(0,10))
-
 ```
 
 
 #####  There is a hypothesis that teams final result are influenced based on whether they play at home or away. Thus, it is imperative we look at the goal distribution between home and away teams. 
 
 ```{r, include=TRUE}
+
 par(mfrow=c(1,2),
   mar=c(4,4,1,0))
 
@@ -74,6 +76,7 @@ data_away_poisson= data.frame(away_poisson)
 ```
 
 ```{r}
+
 ggplot(main_data, aes(hgoal)) +
   #density
   geom_density(adjust = 8, alpha = 0.5, fill= 'red') +
@@ -208,5 +211,44 @@ test_that("single number", {
 
 ```
 
+```{r}
+#Generating the match probabilities
+
+library('plot.matrix')
+max_goals= 8
+#max_goals is the maximum possible goal a team will score
+home_prob= dpois(0:max_goals,home_goal_rate)
+away_prob= dpois(0:max_goals,away_goal_rate)
+
+#Given we assume the two events are independent
+# we multiply the probability of the two events (home and away goal probability)
+#to find the total probability of a particular scoreline happening
+results= outer(home_prob,away_prob)
+#The columns represent the away team and the rows represent the home team
+
+away_chance = sum(triu(results,1))
+home_chance= sum(tril(results,-1))
+draw= sum(diag(results))
+
+total= home_chance+away_chance+draw #should sum close to 1
 
 
+```
+
+
+```{r}
+#Plotting the results matrix
+#png(file="Figure3.png",
+#width=600, height=350)
+rownames(results)<-c(0:max_goals)
+colnames(results)<- c(0:max_goals)
+
+
+par(mar=c(5.1,4.1,4.1,4.1))
+
+plot(results, fmt.cell = '%.3f',digits= NA,xlab= away_team, ylab= home_team, main= 'Match Probabilities',
+     breaks = c(0,0.02,0.05,0.07,0.1,0.5))
+
+
+
+```
